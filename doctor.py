@@ -46,9 +46,9 @@ class Doctor(object):
         result = []
         body = src.split(b'*')
         if len(body) == 2:
-            result.extend(body[0].decode().split(','))
+            result.extend(body[0][1:].decode().split(','))
         else:
-            result.extend(src.decode().split(','))
+            result.extend(src[1:].decode().split(','))
         return result
 
     def physicalCheck(self, *, packet: Packet) -> Carte:

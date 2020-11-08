@@ -112,12 +112,12 @@ class Main(object):
             else:
                 carte = self.doctor.physicalCheck(packet=packet)
                 if carte.good:
-                    logger.debug(carte.nmea)
+                    logger.debug(carte.part)
                     with self.locker:
                         nmea = carte.nmea
                         item = carte.part
-                        symbol = item[0][1:]
-                        self.shelf[symbol] = NmeaShelf(body=nmea, sfi=carte.sfi, at=dt.now())
+                        name = item[0]
+                        self.shelf[name] = NmeaShelf(body=nmea, sfi=carte.sfi, at=dt.now())
 
         self.endWhistle.set()
         for m in self.listner:
