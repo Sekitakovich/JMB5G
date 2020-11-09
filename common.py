@@ -26,7 +26,7 @@ class Packet(object):
 
 
 @dataclass()
-class NmeaShelf(object):
+class News(object):
     sfi: str
     body: bytes
     at: dt

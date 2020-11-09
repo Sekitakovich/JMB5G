@@ -1,63 +1,13 @@
 from typing import Dict, List
 from threading import Thread, Event, Lock
 from queue import Queue, Empty
-import socket
-from contextlib import closing
 import time
 from datetime import datetime as dt
 from loguru import logger
 
-from common import Channel, Packet, NmeaShelf, StreamType
+from common import Channel, Packet, News, StreamType
 from doctor import Doctor
-
-
-class Antenna(Thread):
-    def __init__(self, *, channel: Channel, entryQueue: Queue, endWhistle: Event):
-        super().__init__()
-        self.name = channel.name
-        self.daemon = True
-
-        self.bufferSize = 4096
-        self.timeLimit = 5
-        self.counter = 0
-
-        self.channel = channel
-        self.entryQueye = entryQueue
-        self.endWhistle = endWhistle
-        self.running = True
-
-    def director(self):
-        self.endWhistle.wait()
-        self.endWhistle.clear()
-        self.running = False
-        # logger.debug('[%s] Catch endwhistle' % (self.name))
-
-    def run(self) -> None:
-        director = Thread(target=self.director, daemon=True)
-        director.start()
-
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_DGRAM)) as sock:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
-                            socket.inet_aton(self.channel.ipv4) + socket.inet_aton('0.0.0.0'))
-            sock.settimeout(self.timeLimit)
-            sock.bind(('', self.channel.port))
-            while self.running:
-                try:
-                    stream, ipv4 = sock.recvfrom(self.bufferSize)
-                except (socket.timeout) as e:
-                    logger.warning('[%s] %s' % (self.name, e))
-                    pass
-                except (socket.error) as e:
-                    logger.error('[%s] %s' % (self.name, e))
-                    self.running = False
-                else:
-                    packet = Packet(stream=stream, name=self.name, sender=ipv4[0], counter=self.counter,
-                                    type=self.channel.type)
-                    self.entryQueye.put(packet)
-                    self.counter += 1
-        logger.debug('Sir yes sir!')
-        director.join()
+from antenna import Antenna
 
 
 class Main(object):
@@ -66,7 +16,7 @@ class Main(object):
     '''
 
     def __init__(self):
-        self.shelf: Dict[str, NmeaShelf] = {}
+        self.stock: Dict[str, News] = {}
         self.entryQueue = Queue()
         self.endWhistle = Event()
         self.locker = Lock()
@@ -88,7 +38,7 @@ class Main(object):
         while True:
             time.sleep(1)
             with self.locker:
-                for symbol, body in self.shelf.items():
+                for symbol, body in self.stock.items():
                     print('%s = %s' % (symbol, body))
 
     def dispose(self):
@@ -113,11 +63,14 @@ class Main(object):
                 carte = self.doctor.physicalCheck(packet=packet)
                 if carte.good:
                     logger.debug(carte.part)
+                    nmea = carte.nmea
+                    item = carte.part
+                    name = item[0]
                     with self.locker:
-                        nmea = carte.nmea
-                        item = carte.part
-                        name = item[0]
-                        self.shelf[name] = NmeaShelf(body=nmea, sfi=carte.sfi, at=dt.now())
+                        '''
+                        特別な処理・変換等が必要な場合ここで行う
+                        '''
+                        self.stock[name] = News(body=nmea, sfi=carte.sfi, at=dt.now())
 
         self.endWhistle.set()
         for m in self.listner:
@@ -131,7 +84,7 @@ if __name__ == '__main__':
         M = Main()
         M.dispose()
 
-        for k, v in M.shelf.items():
+        for k, v in M.stock.items():
             print('%s = %s' % (k, v))
 
 
